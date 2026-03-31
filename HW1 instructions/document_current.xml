@@ -1,0 +1,344 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="no" ?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[classdef HW1_m11415015 < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure               matlab.ui.Figure
+        TabGroup               matlab.ui.container.TabGroup
+        FocusTab               matlab.ui.container.Tab
+        AreaSelectionButton    matlab.ui.control.Button
+        DepthSlider            matlab.ui.control.Slider
+        SliderLabel            matlab.ui.control.Label
+        Gauge                  matlab.ui.control.LinearGauge
+        GaugeLabel             matlab.ui.control.Label
+        AutoFocusCheckBox      matlab.ui.control.CheckBox
+        M11415015Label         matlab.ui.control.Label
+        Image                  matlab.ui.control.Image
+        UIAxes                 matlab.ui.control.UIAxes
+        ColorTab               matlab.ui.container.Tab
+        OptionDropDown         matlab.ui.control.DropDown
+        DropDownLabel          matlab.ui.control.Label
+        AreaSelectionButton_2  matlab.ui.control.Button
+        Image2                 matlab.ui.control.Image
+        UIAxes2                matlab.ui.control.UIAxes
+    end
+
+    
+    properties (Access = private)
+        ccimg    % ColorChecker 影像（double 格式）
+        ccMat    % 3×3 色彩校正矩陣
+    end
+    
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Code that executes after component creation
+        function startupFcn(app)
+            app.AreaSelectionButton.Visible  = 'off';
+            app.Image.Visible                = 'off';
+            app.OptionDropDown.Visible       = 'off';
+            app.Image2.Visible               = 'off';
+            app.OptionDropDown.ItemsData = num2cell(1:3);
+            app.OptionDropDown.Items     = {'RAW, G=1', 'Color Correction, G=1', 'Color Correction G=0.5'};
+            app.OptionDropDown.Value     = 3;
+            app.UIAxes.Toolbar.Visible  = 'off';
+            app.UIAxes2.Toolbar.Visible = 'off';
+            app.UIAxes.XLabel.String    = ' ';
+            app.UIAxes.YLabel.String    = ' ';
+            app.UIAxes2.XLabel.String   = ' ';
+            app.UIAxes2.YLabel.String   = ' ';
+            app.Gauge.Limits       = [1 11];
+            app.DepthSlider.Limits = [1 11];
+            app.DepthSlider.Value  = 1;
+            app.ccimg = im2double(imread('cc1.jpg'));
+            app.ccMat = eye(3);
+            DepthSliderValueChanged(app, struct());
+            app.AutoFocusCheckBox.Text = 'Auto Focus';
+            % --- Focus 頁籤元件位置 ---
+            app.UIAxes.Position              = [5,   5,  355, 440];
+            app.Gauge.Position               = [370,  45,  35, 340];
+            app.GaugeLabel.Position          = [370,  10,  50,  22];
+            app.DepthSlider.Position         = [425,  45,   3, 340];
+            app.SliderLabel.Position         = [410,  10,  50,  22];
+            app.Image.Position               = [470, 120, 160, 200];
+            app.AutoFocusCheckBox.Position   = [370, 430, 110,  22];
+            app.M11415015Label.Position      = [490, 430, 145,  22];
+            app.AreaSelectionButton.Position = [370, 390, 120,  35];
+            % --- Color 頁籤元件位置 ---
+            app.UIAxes2.Position               = [5,   5,  355, 440];
+            app.Image2.Position                = [370, 80,  260, 300];
+            app.AreaSelectionButton_2.Position = [370, 420, 120,  35];
+            app.DropDownLabel.Position         = [370,  50,  55,  22];
+            app.OptionDropDown.Position        = [430,  50, 200,  22];
+        end
+
+        % Value changed function: DepthSlider
+        function DepthSliderValueChanged(app, event)
+            idx = round(app.DepthSlider.Value);
+            idx = max(1, min(11, idx));
+            img = imread(sprintf('e%d.jpg', idx));
+            imshow(img, 'Parent', app.UIAxes);
+            app.Gauge.Value = idx;
+        end
+
+        % Value changed function: AutoFocusCheckBox
+        function AutoFocusCheckBoxValueChanged(app, event)
+            if app.AutoFocusCheckBox.Value
+                app.AreaSelectionButton.Visible = 'on';
+                app.DepthSlider.Visible         = 'off';
+            else
+                app.AreaSelectionButton.Visible = 'off';
+                app.Image.Visible               = 'off';
+                app.DepthSlider.Visible         = 'on';
+            end
+        end
+
+        % Button pushed function: AreaSelectionButton
+        function AreaSelectionButtonPushed(app, event)
+            imgs = cell(1, 11);
+            for i = 1:11
+                imgs{i} = im2double(imread(sprintf('e%d.jpg', i)));
+            end
+            fig_temp = figure;
+            imshow(imgs{1});
+            title('點選矩形左上角，再點選右下角（共2點）');
+            [gx, gy] = ginput(2);
+            close(fig_temp);
+            x1 = round(min(gx));
+            y1 = round(min(gy));
+            x2 = round(max(gx));
+            y2 = round(max(gy));
+            [imgH, imgW, ~] = size(imgs{1});
+            x1 = max(1, x1);
+            y1 = max(1, y1);
+            x2 = min(imgW, x2);
+            y2 = min(imgH, y2);
+            if x2 <= x1 || y2 <= y1
+                delete(roi);
+                title(app.UIAxes, '無效的選取區域，請重試');
+                return;
+            end
+            edgeRatios = zeros(1, 11);
+            for i = 1:11
+                crop    = imgs{i}(y1:y2, x1:x2, :);
+                gray    = rgb2gray(crop);
+                edgeMap = edge(gray, 'Canny');
+                edgeRatios(i) = mean2(edgeMap);
+            end
+            [~, bestIdx] = max(edgeRatios);
+            imshow(imgs{bestIdx}, 'Parent', app.UIAxes);
+            title(app.UIAxes, sprintf('最佳對焦：e%d.jpg', bestIdx));
+            roiImg = imgs{bestIdx}(y1:y2, x1:x2, :);
+            app.Image.ImageSource = roiImg;
+            app.Image.Visible     = 'on';
+            app.Gauge.Value = bestIdx;
+            delete(roi);
+        end
+
+        % Button pushed function: AreaSelectionButton_2
+        function AreaSelectionButton_2Pushed(app, event)
+             fig_temp = figure;
+            imshow(app.ccimg);
+            title('依序點選 ColorChecker 四角（左上→右上→右下→左下），共4點');
+            [gx, gy] = ginput(4);
+            close(fig_temp);
+            srcPoints = [gx, gy];
+            
+            targetW   = 600;
+            targetH   = 400;
+            dstPoints = [1 1; targetW 1; targetW targetH; 1 targetH];
+            tform     = fitgeotrans(srcPoints, dstPoints, 'projective');
+            ccRect    = imwarp(app.ccimg, tform, 'OutputView', imref2d([targetH targetW]));
+            imshow(ccRect, 'Parent', app.UIAxes2);
+            title(app.UIAxes2, '透視校正後的 ColorChecker');
+            rows = 4; cols = 6;
+            blockH = floor(targetH / rows);
+            blockW = floor(targetW / cols);
+            RGB_values = zeros(rows * cols, 3);
+            pIdx = 1;
+            for r = 1:rows
+                for c = 1:cols
+                    xS = (c-1) * blockW + 1;
+                    yS = (r-1) * blockH + 1;
+                    block = ccRect(yS:yS+blockH-1, xS:xS+blockW-1, :);
+                    RGB_values(pIdx, :) = squeeze(mean(mean(block, 1), 2));
+                    pIdx = pIdx + 1;
+                end
+            end
+            data       = load('RGB_target.mat');
+            fn         = fieldnames(data);
+            RGB_target = data.(fn{1});
+            if rank(RGB_values) < 3
+                delete(h);
+                title(app.UIAxes2, 'RGB_values 奇異，無法計算 ccMat');
+                return;
+            end
+            app.ccMat = RGB_values \ RGB_target;
+            app.OptionDropDown.Visible = 'on';
+            app.Image2.Visible         = 'on';
+            delete(h);
+            OptionDropDownValueChanged(app);
+        end
+
+        % Value changed function: OptionDropDown
+        function OptionDropDownValueChanged(app, event)
+            val = app.OptionDropDown.Value;
+            switch val
+                case 1
+                    M           = eye(3);
+                    gamma_value = 1;
+                case 2
+                    M           = app.ccMat;
+                    gamma_value = 1;
+                case 3
+                    M           = app.ccMat;
+                    gamma_value = 0.5;
+                otherwise
+                    return;
+            end
+            [imgH, imgW, ~] = size(app.ccimg);
+            ccimg2d = reshape(app.ccimg, [], 3);
+            out2d   = ccimg2d * M;
+            out     = reshape(out2d, imgH, imgW, 3);
+            out     = max(0, min(1, out));
+            out     = out .^ gamma_value;
+            app.Image2.ImageSource = out;
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure and hide until all components are created
+            app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure.Position = [100 100 640 480];
+            app.UIFigure.Name = 'MATLAB App';
+
+            % Create TabGroup
+            app.TabGroup = uitabgroup(app.UIFigure);
+            app.TabGroup.Position = [1 1 640 480];
+
+            % Create FocusTab
+            app.FocusTab = uitab(app.TabGroup);
+            app.FocusTab.Title = 'Focus';
+
+            % Create UIAxes
+            app.UIAxes = uiaxes(app.FocusTab);
+            title(app.UIAxes, 'Title')
+            xlabel(app.UIAxes, 'X')
+            ylabel(app.UIAxes, 'Y')
+            zlabel(app.UIAxes, 'Z')
+            app.UIAxes.Position = [0 1 300 428];
+
+            % Create Image
+            app.Image = uiimage(app.FocusTab);
+            app.Image.Position = [386 79 254 236];
+
+            % Create M11415015Label
+            app.M11415015Label = uilabel(app.FocusTab);
+            app.M11415015Label.Position = [536 374 68 22];
+            app.M11415015Label.Text = 'M11415015';
+
+            % Create AutoFocusCheckBox
+            app.AutoFocusCheckBox = uicheckbox(app.FocusTab);
+            app.AutoFocusCheckBox.ValueChangedFcn = createCallbackFcn(app, @AutoFocusCheckBoxValueChanged, true);
+            app.AutoFocusCheckBox.Position = [334 407 80 22];
+
+            % Create GaugeLabel
+            app.GaugeLabel = uilabel(app.FocusTab);
+            app.GaugeLabel.HorizontalAlignment = 'center';
+            app.GaugeLabel.Position = [354 47 41 22];
+            app.GaugeLabel.Text = 'Gauge';
+
+            % Create Gauge
+            app.Gauge = uigauge(app.FocusTab, 'linear');
+            app.Gauge.Orientation = 'vertical';
+            app.Gauge.Position = [314 84 39 120];
+
+            % Create SliderLabel
+            app.SliderLabel = uilabel(app.FocusTab);
+            app.SliderLabel.HorizontalAlignment = 'right';
+            app.SliderLabel.Position = [308 47 36 22];
+            app.SliderLabel.Text = 'Slider';
+
+            % Create DepthSlider
+            app.DepthSlider = uislider(app.FocusTab);
+            app.DepthSlider.Orientation = 'vertical';
+            app.DepthSlider.ValueChangedFcn = createCallbackFcn(app, @DepthSliderValueChanged, true);
+            app.DepthSlider.Position = [366 56 3 150];
+
+            % Create AreaSelectionButton
+            app.AreaSelectionButton = uibutton(app.FocusTab, 'push');
+            app.AreaSelectionButton.ButtonPushedFcn = createCallbackFcn(app, @AreaSelectionButtonPushed, true);
+            app.AreaSelectionButton.Position = [334 373 100 23];
+            app.AreaSelectionButton.Text = 'Area Selection';
+
+            % Create ColorTab
+            app.ColorTab = uitab(app.TabGroup);
+            app.ColorTab.Title = 'Color';
+
+            % Create UIAxes2
+            app.UIAxes2 = uiaxes(app.ColorTab);
+            title(app.UIAxes2, 'Title')
+            xlabel(app.UIAxes2, 'X')
+            ylabel(app.UIAxes2, 'Y')
+            zlabel(app.UIAxes2, 'Z')
+            app.UIAxes2.Position = [9 166 300 185];
+
+            % Create Image2
+            app.Image2 = uiimage(app.ColorTab);
+            app.Image2.Position = [413 152 176 199];
+
+            % Create AreaSelectionButton_2
+            app.AreaSelectionButton_2 = uibutton(app.ColorTab, 'push');
+            app.AreaSelectionButton_2.ButtonPushedFcn = createCallbackFcn(app, @AreaSelectionButton_2Pushed, true);
+            app.AreaSelectionButton_2.Position = [244 420 100 23];
+            app.AreaSelectionButton_2.Text = 'Area Selection';
+
+            % Create DropDownLabel
+            app.DropDownLabel = uilabel(app.ColorTab);
+            app.DropDownLabel.HorizontalAlignment = 'right';
+            app.DropDownLabel.Position = [244 386 65 22];
+            app.DropDownLabel.Text = 'Drop Down';
+
+            % Create OptionDropDown
+            app.OptionDropDown = uidropdown(app.ColorTab);
+            app.OptionDropDown.ValueChangedFcn = createCallbackFcn(app, @OptionDropDownValueChanged, true);
+            app.OptionDropDown.Position = [324 386 100 22];
+
+            % Show the figure after all components are created
+            app.UIFigure.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = HW1_m11415015
+
+            % Create UIFigure and components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            % Execute the startup function
+            runStartupFcn(app, @startupFcn)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
+end]]></w:t></w:r></w:p></w:body></w:document>
