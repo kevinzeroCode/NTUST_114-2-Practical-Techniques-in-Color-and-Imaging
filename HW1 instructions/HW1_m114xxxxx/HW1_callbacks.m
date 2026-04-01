@@ -123,10 +123,16 @@ function AreaSelectionButtonPushed(app, event)
     title(ax_temp, '請用滑鼠拖曳框選對焦區域');
 
     % ------ 用 rbbox 實現拖曳框選（base MATLAB 橡皮筋矩形）------
-    waitforbuttonpress;                     % 等待滑鼠按下
-    point1 = get(ax_temp, 'CurrentPoint');  % 按下時的座標
-    rbbox;                                  % 橡皮筋拖曳，放開時返回
-    point2 = get(ax_temp, 'CurrentPoint');  % 放開時的座標
+    % 防呆：若使用者中途關閉視窗，try-catch 避免程式崩潰
+    try
+        waitforbuttonpress;                     % 等待滑鼠按下
+        point1 = get(ax_temp, 'CurrentPoint');  % 按下時的座標
+        rbbox;                                  % 橡皮筋拖曳，放開時返回
+        point2 = get(ax_temp, 'CurrentPoint');  % 放開時的座標
+    catch
+        if ishandle(fig_temp), close(fig_temp); end
+        return;
+    end
     close(fig_temp);
 
     % ------ 計算 ROI 範圍 ------
@@ -190,21 +196,32 @@ function AreaSelectionButton_2Pushed(app, event)
     title(ax_temp, '請依序點選 ColorChecker 四角（左上→右上→右下→左下）');
 
     % ------ 逐點點擊 + 即時標記（顯示涵蓋範圍）------
+    % 防呆：若使用者中途關閉視窗，try-catch 避免程式崩潰
     srcPoints = zeros(4, 2);
     cornerNames = {'左上', '右上', '右下', '左下'};
     hold(ax_temp, 'on');
-    for k = 1:4
-        title(ax_temp, sprintf('請點選第 %d 點（%s）', k, cornerNames{k}));
-        [px, py] = ginput(1);
-        srcPoints(k, :) = [px, py];
-        plot(ax_temp, px, py, 'ro', 'MarkerSize', 10, 'LineWidth', 2);
-        text(ax_temp, px+5, py-5, num2str(k), 'Color', 'r', 'FontSize', 14, 'FontWeight', 'bold');
-        if k > 1
-            plot(ax_temp, srcPoints(k-1:k, 1), srcPoints(k-1:k, 2), 'r-', 'LineWidth', 2);
+    try
+        for k = 1:4
+            title(ax_temp, sprintf('請點選第 %d 點（%s）', k, cornerNames{k}));
+            [px, py] = ginput(1);
+            % 防呆：ginput 回傳空值（視窗被關閉）則中止
+            if isempty(px) || isempty(py)
+                if ishandle(fig_temp), close(fig_temp); end
+                return;
+            end
+            srcPoints(k, :) = [px, py];
+            plot(ax_temp, px, py, 'ro', 'MarkerSize', 10, 'LineWidth', 2);
+            text(ax_temp, px+5, py-5, num2str(k), 'Color', 'r', 'FontSize', 14, 'FontWeight', 'bold');
+            if k > 1
+                plot(ax_temp, srcPoints(k-1:k, 1), srcPoints(k-1:k, 2), 'r-', 'LineWidth', 2);
+            end
+            if k == 4
+                plot(ax_temp, srcPoints([4 1], 1), srcPoints([4 1], 2), 'r-', 'LineWidth', 2);
+            end
         end
-        if k == 4
-            plot(ax_temp, srcPoints([4 1], 1), srcPoints([4 1], 2), 'r-', 'LineWidth', 2);
-        end
+    catch
+        if ishandle(fig_temp), close(fig_temp); end
+        return;
     end
     hold(ax_temp, 'off');
     pause(0.5);
@@ -226,6 +243,12 @@ function AreaSelectionButton_2Pushed(app, event)
     end
     [~, ~, V] = svd(A);
     H = reshape(V(:,end), 3, 3)';
+
+    % ------ 防呆：確保 Homography 矩陣條件數合理（四點不共線）------
+    if cond(H) > 1e8
+        title(app.UIAxes2, '⚠ 四角點接近共線或重合，請重新選取');
+        return;
+    end
 
     % ------ 反向映射 + interp2（取代 imwarp + imref2d）------
     Hinv = H \ eye(3);
