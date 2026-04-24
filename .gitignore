@@ -1,0 +1,38 @@
+# MATLAB
+*.asv
+*.m~
+*.autosave
+slprj/
+sccprj/
+*.mex*
+*.mexw64
+*.mexa64
+*.mexmaci64
+octave-workspace
+
+# Video/large test assets
+*.mp4
+*.avi
+*.mov
+!**/HW1_demo.mp4
+!**/HW2_demo.mp4
+
+# Source material zips
+HW2_instructions.zip
+*_instructions.zip
+
+# Debug/extracted folders
+HW2_instructions/mlapp_extracted/
+HW2_instructions/merge.mp4
+HW2_instructions/s.jpg
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
