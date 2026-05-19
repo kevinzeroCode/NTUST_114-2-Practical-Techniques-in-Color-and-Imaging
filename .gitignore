@@ -20,11 +20,14 @@ octave-workspace
 # Source material zips
 HW2_instructions.zip
 *_instructions.zip
+HW3 instructions.zip
 
 # Debug/extracted folders
 HW2_instructions/mlapp_extracted/
 HW2_instructions/merge.mp4
 HW2_instructions/s.jpg
+HW3 instructions/build/
+HW3 instructions/output.jpg
 
 # OS
 .DS_Store
